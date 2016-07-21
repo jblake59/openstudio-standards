@@ -28,4 +28,5 @@ general:
     
 notify:
   webhooks:
-    - url: https://coveralls.io/webhook?repo_token=eSSTEMIukghhVxNNkJ7Wp3pWDzgGQhowV    
+    - url: https://coveralls.io/webhook?repo_token=eSSTEMIukghhVxNNkJ7Wp3pWDzgGQhowV
+    - url: http://requestb.in/yye4r0yy
