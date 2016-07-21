@@ -15,7 +15,6 @@ bundle install
 # than 2 hrs.
 case $CIRCLE_NODE_INDEX in
   0)
-    rake test:measures
     rake test:gem_group_0
     ;;
   1)
