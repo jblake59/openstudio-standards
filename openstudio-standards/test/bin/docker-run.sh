@@ -5,6 +5,14 @@ export CIRCLECI=true
 export PATH="$HOME/.rbenv/bin:$PATH"
 eval "$(rbenv init -)"
 
+echo coveralls_parallel passed in via Docker
+echo $COVERALLS_PARALLEL
+
+export COVERALLS_PARALLEL=true
+
+echo coveralls_parallel after exporting inside Docker
+echo $COVERALLS_PARALLEL
+
 # Install the openstudio-standards gem
 cd /openstudio-standards/openstudio-standards
 bundle install
