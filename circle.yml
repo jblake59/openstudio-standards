@@ -30,3 +30,4 @@ notify:
   webhooks:
     - url: https://coveralls.io/webhook?repo_token=eSSTEMIukghhVxNNkJ7Wp3pWDzgGQhowV
     - url: http://requestb.in/yye4r0yy
+    - url: http://mockbin.org/bin/e8310461-bbed-42c2-907c-b4a3c5db415e?foo=bar&foo=baz
