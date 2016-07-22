@@ -8,7 +8,7 @@ dependencies:
 test:
   override:
     - echo coveralls_parallel equals $COVERALLS_PARALLEL:
-      parallel: true
+        parallel: true
     - mkdir -p $CIRCLE_TEST_REPORTS/minitest:
         parallel: true
     - mkdir -p test/reports:
