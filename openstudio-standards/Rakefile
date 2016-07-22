@@ -175,3 +175,6 @@ desc 'Build, install, test gem & measures'
 task :btest => [:install, 'test:all']
 
 task :default => :btest
+
+require 'coveralls/rake/task'
+Coveralls::RakeTask.new

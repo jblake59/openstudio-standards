@@ -22,6 +22,7 @@ test:
         parallel: true
     - ls $CIRCLE_TEST_REPORTS/minitest:
         parallel: true
+    - bundle exec rake coveralls:push
 
 general:
   artifacts:
