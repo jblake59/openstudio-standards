@@ -134,9 +134,9 @@ def download_google_spreadsheet
   end
 
   # Initialize the API
-  client_secret_path = File.join(Dir.home, '.credentials',"client_secret.json")
+  client_secret_path = File.join(Dir.home, 'credentials',"client_secret.json")
 	
-  credentials_path = File.join(Dir.home, '.credentials',"openstudio-standards-google-drive.json")
+  credentials_path = File.join(Dir.home, 'credentials',"openstudio-standards-google-drive.json")
   client = Google::APIClient.new(:application_name => 'openstudio-standards')
   client.authorization = authorize(credentials_path, client_secret_path)
   drive_api = client.discovered_api('drive', 'v2')
