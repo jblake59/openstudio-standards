@@ -92,7 +92,7 @@ class OpenStudio::Model::Model
       add_design_days_and_weather_file(building_type, template, climate_zone, epw_file)
       apply_sizing_parameters(building_type, template)
       yearDescription.get.setDayofWeekforStartDay('Sunday')
-
+      apply_fenestration_orientation(template, climate_zone)
     end
     # set climate zone and building type
     getBuilding.setStandardsBuildingType(building_type)

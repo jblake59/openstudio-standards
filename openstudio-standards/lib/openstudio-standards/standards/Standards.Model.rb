@@ -4005,6 +4005,202 @@ class OpenStudio::Model::Model
     end
   end
 
+  # Checks the WWR vs SHGC per 9.1.3.2*K
+  def apply_fenestration_orientation(template, climate_zone)
+  
+    # The vertical fenestration shall comply with either (a) or (b)
+    # (a.) AW ≤ (AT)/4 and AE ≤ (AT)/4
+    # (b.) 
+    # CZ 0-3:
+    #   AW x SHGCW ≤ (AT x SHGCC)/4 and AE x SHGCE ≤ (AT x SHGCC)/4
+    # CZ 4-8:
+    #   AW x SHGCW ≤ (AT x SHGCC)/5 and AE x SHGCE ≤ (AT x SHGCC)/5
+
+    # Calculate the area of the windows for E and W and total
+    window_area_west_m2 = 0
+    window_area_east_m2 = 0
+    window_area_tot_m2 = 0
+    getSurfaces.each do |surface|
+      # Skip non-exterior surfaces
+      next unless surface.outsideBoundaryCondition == 'Outdoors'
+      # Skip non-walls
+      next unless surface.surfaceType == 'Wall'
+      # Get the multiplier for this surface's space,
+      mult = 1
+      if surface.space.is_initialized
+        space = surface.space.get
+        mult = space.multiplier
+      end
+      # If here, add up the area of all windows
+      surface.subSurfaces.each do |sub_surface|
+        # Skip opaque sub-surfaces like non-glass doors
+        next unless sub_surface.subSurfaceType == 'FixedWindow' || sub_surface.subSurfaceType == 'OperableWindow' || sub_surface.subSurfaceType == 'GlassDoor'
+        # Determine the azimuth/orientation
+        azimuth_rad = sub_surface.azimuth
+        azimuth_deg = OpenStudio.convert(azimuth_rad, 'rad', 'deg').get
+
+        # Add the area of the window
+        area_m2 = sub_surface.grossArea * mult
+        window_area_tot_m2 += area_m2
+        # Depending on the orientation
+        if azimuth_deg > 67.5 && azimuth_deg < 135
+          # East
+          window_area_east_m2 += area_m2
+        elsif azimuth_deg > 225 && azimuth_deg < 292.5
+          # West
+          window_area_west_m2 += area_m2
+        end
+
+      end
+ 
+    end
+    
+    # Check if AW ≤ (AT)/4 and AE ≤ (AT)/4
+    pct_west = window_area_west_m2 / window_area_tot_m2
+    pct_east = window_area_east_m2 / window_area_tot_m2
+    if pct_west <= 0.23 && pct_east <= 0.23
+      OpenStudio.logFree(OpenStudio::Info, 'openstudio.standards.Model', "East and West fenestration are both less than 25% of total. East = #{pct_east.round(2)}, West = #{pct_west.round(2)}.  East = #{window_area_east_m2} m^2, West = #{window_area_west_m2} m^2, total = #{window_area_tot_m2} m^2.")
+      return true
+    end
+    
+    OpenStudio.logFree(OpenStudio::Info, 'openstudio.standards.Model', "Either East or West fenestration was more than 25% of total.  East = #{pct_east.round(2)}, West = #{pct_west.round(2)}.")
+    
+    # Get the SHGC for this climate zone
+    search_criteria = {}
+    search_criteria['template'] = template
+    search_criteria['intended_surface_type'] = 'ExteriorWindow'
+    search_criteria['standards_construction_type'] = 'Metal framing (all other)'
+    search_criteria['building_category'] = 'Nonresidential'
+    climate_zone_set = find_climate_zone_set(climate_zone, template)
+    search_criteria['climate_zone_set'] = climate_zone_set
+
+    # Get the window properties
+    data = find_object($os_standards['construction_properties'], search_criteria)
+    if data.nil?
+      OpenStudio.logFree(OpenStudio::Error, 'openstudio.standards.Model', "Could not find window properties to look up SHGC.")
+      return false
+    end
+    
+    # Get the SHGC from the window properties
+    shgc_code = data['assembly_maximum_solar_heat_gain_coefficient']
+    OpenStudio.logFree(OpenStudio::Info, 'openstudio.standards.Model', "SHGC code is #{shgc_code} for #{climate_zone}.")
+    
+    # Calculate the new SHGC West and East
+    # required multiplier.
+    # CZ 0-3:
+    #   AW x SHGCW ≤ (AT x SHGCC)/4 and AE x SHGCE ≤ (AT x SHGCC)/4
+    # CZ 4-8:
+    #   AW x SHGCW ≤ (AT x SHGCC)/5 and AE x SHGCE ≤ (AT x SHGCC)/5
+    shgc_target_west = nil
+    shgc_target_east = nil
+    case climate_zone
+    when 'ASHRAE 169-2006-1A',
+          'ASHRAE 169-2006-1B',
+          'ASHRAE 169-2006-2A',
+          'ASHRAE 169-2006-2B',
+          'ASHRAE 169-2006-3A',
+          'ASHRAE 169-2006-3B',
+          'ASHRAE 169-2006-3C'
+      shgc_target_west = ((window_area_tot_m2 * shgc_code) / 4) / window_area_west_m2
+      shgc_target_east = ((window_area_tot_m2 * shgc_code) / 4) / window_area_east_m2     
+    else
+      shgc_target_west = ((window_area_tot_m2 * shgc_code) / 5) / window_area_west_m2
+      shgc_target_east = ((window_area_tot_m2 * shgc_code) / 5) / window_area_east_m2
+    end
+  
+    OpenStudio.logFree(OpenStudio::Info, 'openstudio.standards.Model', "SHGC West target = #{shgc_target_west}, SHGC East target = #{shgc_target_east}.")
+  
+    OpenStudio.logFree(OpenStudio::Error, 'openstudio.standards.Model', "Got into the apply_fenestration_orientation method.")
+  
+  end
+  
+  
+  
+  
+  
+  
+=begin 
+    # return true unless template == '90.1-2016'
+  
+
+        # Loop through all spaces in the model, and
+    # per the PNNL PRM Reference Manual, find the areas
+    # of each space conditioning category (res, nonres, semi-heated)
+    # separately.  Include space multipliers.
+    window_w_m2 = 0
+    window_e_m2 = 0
+    window_tot_m2 = 0
+    # Store the space conditioning category for later use
+    space_cats = {}
+    getSpaces.each do |space|
+      # Loop through all surfaces in this space
+      space.surfaces.sort.each do |surface|
+        # Skip non-outdoor surfaces
+        next unless surface.outsideBoundaryCondition == 'Outdoors'
+        # Skip non-walls
+        next unless surface.surfaceType.casecmp('wall').zero?
+        # Subsurfaces in this surface
+        surface.subSurfaces.sort.each do |ss|
+          if ss.subSurfaceType == 'FixedWindow' || ss.subSurfaceType == 'OperableWindow'
+            # Check the orientation
+          
+            wind_area_m2 += ss.netArea * space.multiplier
+          end
+        end
+      end
+
+      # Determine the space category
+      # TODO This should really use the heating/cooling loads
+      # from the proposed building.  However, in an attempt
+      # to avoid another sizing run just for this purpose,
+      # conditioned status is based on heating/cooling
+      # setpoints.  If heated-only, will be assumed Semiheated.
+      # The full-bore method is on the next line in case needed.
+      # cat = space.conditioning_category(template, climate_zone)
+      cooled = space.cooled?
+      heated = space.heated?
+      cat = 'Unconditioned'
+      # Unconditioned
+      if !heated && !cooled
+        cat = 'Unconditioned'
+      # Heated-Only
+      elsif heated && !cooled
+        cat = 'Semiheated'
+      # Heated and Cooled
+      else
+        res = space.residential?(template)
+        cat = if res
+                'ResConditioned'
+              else
+                'NonResConditioned'
+              end
+      end
+      space_cats[space] = cat
+
+      # Add to the correct category
+      case cat
+      when 'Unconditioned'
+        next # Skip unconditioned spaces
+      when 'NonResConditioned'
+        nr_wall_m2 += wall_area_m2
+        nr_wind_m2 += wind_area_m2
+      when 'ResConditioned'
+        res_wall_m2 += wall_area_m2
+        res_wind_m2 += wind_area_m2
+      when 'Semiheated'
+        sh_wall_m2 += wall_area_m2
+        sh_wind_m2 += wind_area_m2
+      end
+      # keep track of totals for NECB
+      total_wall_m2 += wall_area_m2
+      total_subsurface_m2 += wind_area_m2 # this contains doors as well.
+    end
+      
+  
+  
+  
+  end
+=end  
   private
 
   # Helper method to fill in hourly values
